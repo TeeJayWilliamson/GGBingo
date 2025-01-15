@@ -1,12 +1,16 @@
 let panorama;
 const INITIAL_TIME = 20;
 const bingoItems = [
-    'Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle',
-    'Traffic Light', 'Bus Stop', 'Bridge', 'Park', 'Restaurant',
-    'School', 'Church', 'Hospital', 'Police Station', 'Fire Hydrant',
-    'Mailbox', 'Bench', 'Fountain', 'Statue', 'Flag',
-    'Crosswalk', 'Billboard', 'Parking Meter', 'Street Lamp'
+    'On a Boat', 'Inside', 'Trees', 'Hotel', 'Streetview Car Shadow', 
+    'Beach', 'Cemetery', 'Car', 'Moped', 'Bicycle', 'Swimming Pool', 
+    'Playground', 'Cruise Ship', 'Bridge', 'Animal', 'Airplane', 
+    'Birds Eye View', 'Flag', 'Stop Sign', 'Lighthouse', 'Hospital', 
+    'Church', 'Waterfall', 'Mountains', 'Billboard', 'Police Station', 
+    'Fountain', 'Mailbox', 'Black Screen (Whoops Sorry!)', 'Statue', 
+    'Traffic Lights', 'Graffiti', 'Ice Cream Truck', 'Windmill', 
+    'Restaurant', 'Birds', 'Snow', 'Walking a Dog'
 ];
+
 let currentItems = [];
 let timer;
 let timeLeft = INITIAL_TIME;
@@ -57,21 +61,21 @@ document.addEventListener('DOMContentLoaded', () => {
             hideLogo(); // Hide the logo when the game starts
             gameStarted = true; // Set the flag to true indicating the game has started
             startGameButton.textContent = 'Restart Game'; // Change button text to "Restart Game"
-
-            // Start the game logic here (e.g., call the game loop, etc.)
-            gameLoop();
+        
+            gameLoop(); // Start the game logic here
         } else {
             console.log("Restart Game clicked");
             showLogo(); // Show the logo when restarting the game
-
+        
             // Reset the game state and stop the current game loop (if needed)
-            restartGame();
-
-            // Wait for another button press to start the next round
-            gameStarted = false; // Reset the game state so the button can be used again
+            restartGame(); // Now stops the game and resets it
+        
+            gameStarted = false; // Reset the game state
             startGameButton.textContent = 'Start Game'; // Change button text back to "Start Game"
         }
     });
+    
+    
 });
 
 function createBingoBoard() {
@@ -147,27 +151,29 @@ function getRandomStreetView() {
         }
     });
 }
+
 function setTimer(duration) {
-    timeLeft = Math.floor(duration / 1000);
-    updateTimer();
-    if (timer) clearInterval(timer);
+    timeLeft = Math.floor(duration / 1000); // Convert milliseconds to seconds
+    updateTimer(); // Update the UI to show the timer
+    if (timer) clearInterval(timer); // Stop any existing timer
     
     timer = setInterval(() => {
-        if (!gameInProgress) {
+        if (!gameInProgress) { // If the game is not in progress, stop the timer
             clearInterval(timer);
             return;
         }
-        
+
         timeLeft--;
         updateTimer();
-        
+
         if (timeLeft <= 0) {
             getRandomStreetView(); // Get new street view
-            timeLeft = INITIAL_TIME; // Reset timer
+            timeLeft = INITIAL_TIME; // Reset the timer
             updateTimer();
         }
-    }, 1000);
+    }, 1000); // Update every second
 }
+
 
 function showStreetView(duration) {
     return new Promise(resolve => {
@@ -238,48 +244,51 @@ function updateStartButton() {
 }
 
 function restartGame() {
-    if (timer) {
-        clearInterval(timer); // Keep the timer stopped
-        timer = null;
-    }
+    stopGame(); // Stop the game first
 
+    // Reset the game state
     gameInProgress = false;
-    timeLeft = INITIAL_TIME; // Reset the time for the new game, but don't restart the clock yet
+    timeLeft = INITIAL_TIME; // Reset the time for the new game
     createBingoBoard(); // Reset the bingo board
-    updateTimer();
+    updateTimer(); // Update the timer display
 
     const startButton = document.getElementById('start-game');
     if (startButton) {
-        startButton.textContent = 'Start Game'; // Keep it as 'Start Game' instead of 'Restart Game'
-        startButton.removeEventListener('click', restartGame);
+        startButton.textContent = 'Start Game'; // Change button back to "Start Game"
+        startButton.removeEventListener('click', restartGame); // Remove the restart game listener
         startButton.addEventListener('click', gameLoop); // Attach gameLoop to start the game
     }
 
     if (panorama) {
-        panorama.setVisible(false);
+        panorama.setVisible(false); // Hide the panorama
     }
 
     togglePlaceholderImage(true); // Show the placeholder image
 }
 
 
+
+
+
 function gameLoop() {
-    if (gameInProgress) return;
+    if (gameInProgress) return; // Don't start a new game if one is already in progress
 
     gameInProgress = true;
     console.log("gameLoop called");
 
     togglePlaceholderImage(false); // Hide the placeholder image
 
+    // Reset the bingo board and allow user interaction
     const cells = document.querySelectorAll('.bingo-cell');
     cells.forEach(cell => {
-        cell.style.pointerEvents = 'auto';
-        cell.classList.remove('marked');
+        cell.style.pointerEvents = 'auto'; // Enable clicks
+        cell.classList.remove('marked'); // Reset markings
     });
 
-    getRandomStreetView();
-    setTimer(20000); // Start initial timer
+    getRandomStreetView(); // Get a random street view
+    setTimer(20000); // Start the timer with 20 seconds
 }
+
 
 function shuffleArray(array) {
     const newArray = [...array];
