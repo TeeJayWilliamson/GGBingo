@@ -29,6 +29,18 @@ body {
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
+#logo {
+    position: absolute;
+    z-index: 10; /* Ensures it stays on top of the Street View */
+    max-width: 560px;
+    transition: opacity 1.5s ease;
+}
+
+#logo.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
 #bingo-board {
     display: grid;
     grid-template-columns: repeat(5, 1fr);

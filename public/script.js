@@ -20,12 +20,59 @@ function initGame() {
         console.error("Google Maps not loaded!");
         return;
     }
+    togglePlaceholderImage(true); // Show the placeholder image initially
     createBingoBoard();
     initializeStreetView();
+
     const startButton = document.getElementById('start-game');
     startButton.removeEventListener('click', gameLoop);
     startButton.addEventListener('click', gameLoop);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const logo = document.getElementById('logo');
+    const startGameButton = document.getElementById('start-game'); // "Start Game" button
+    let gameStarted = false; // Flag to track if the game has started
+
+    // Function to hide the logo
+    function hideLogo() {
+        if (logo) {
+            console.log("Hiding logo");
+            logo.classList.add('hidden'); // Add the 'hidden' class to fade out the logo
+        }
+    }
+
+    // Function to show the logo
+    function showLogo() {
+        if (logo) {
+            console.log("Showing logo");
+            logo.classList.remove('hidden'); // Remove the 'hidden' class to bring the logo back
+        }
+    }
+
+    // Event listener for "Start Game" / "Restart Game"
+    startGameButton.addEventListener('click', () => {
+        if (!gameStarted) {
+            console.log("Start Game clicked");
+            hideLogo(); // Hide the logo when the game starts
+            gameStarted = true; // Set the flag to true indicating the game has started
+            startGameButton.textContent = 'Restart Game'; // Change button text to "Restart Game"
+
+            // Start the game logic here (e.g., call the game loop, etc.)
+            gameLoop();
+        } else {
+            console.log("Restart Game clicked");
+            showLogo(); // Show the logo when restarting the game
+
+            // Reset the game state and stop the current game loop (if needed)
+            restartGame();
+
+            // Wait for another button press to start the next round
+            gameStarted = false; // Reset the game state so the button can be used again
+            startGameButton.textContent = 'Start Game'; // Change button text back to "Start Game"
+        }
+    });
+});
 
 function createBingoBoard() {
     const board = document.getElementById('bingo-board');
@@ -196,36 +243,40 @@ function restartGame() {
         clearInterval(timer);
         timer = null;
     }
-    
+
     gameInProgress = false;
     timeLeft = INITIAL_TIME;
     createBingoBoard();
     updateTimer();
-    
+
     const startButton = document.getElementById('start-game');
     if (startButton) {
         startButton.textContent = 'Start Game';
         startButton.removeEventListener('click', restartGame);
         startButton.addEventListener('click', gameLoop);
     }
-    
+
     if (panorama) {
         panorama.setVisible(false);
     }
+
+    togglePlaceholderImage(true); // Show the placeholder image
 }
 
 function gameLoop() {
     if (gameInProgress) return;
-    
+
     gameInProgress = true;
     console.log("gameLoop called");
-    
+
+    togglePlaceholderImage(false); // Hide the placeholder image
+
     const cells = document.querySelectorAll('.bingo-cell');
     cells.forEach(cell => {
         cell.style.pointerEvents = 'auto';
         cell.classList.remove('marked');
     });
-    
+
     getRandomStreetView();
     setTimer(20000); // Start initial timer
 }
@@ -242,6 +293,13 @@ function shuffleArray(array) {
 function gm_authFailure() {
     console.error("Google Maps failed to load!");
     alert("Failed to load Google Maps. Please check your API key and try again.");
+}
+
+function togglePlaceholderImage(show) {
+    const placeholderImage = document.getElementById('./img/GGBingo Logo.png');
+    if (placeholderImage) {
+        placeholderImage.style.display = show ? 'block' : 'none';
+    }
 }
 
 // Initialize the game when the Google Maps API is loaded
