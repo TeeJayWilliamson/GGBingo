@@ -147,7 +147,6 @@ function getRandomStreetView() {
         }
     });
 }
-
 function setTimer(duration) {
     timeLeft = Math.floor(duration / 1000);
     updateTimer();
@@ -240,20 +239,20 @@ function updateStartButton() {
 
 function restartGame() {
     if (timer) {
-        clearInterval(timer);
+        clearInterval(timer); // Keep the timer stopped
         timer = null;
     }
 
     gameInProgress = false;
-    timeLeft = INITIAL_TIME;
-    createBingoBoard();
+    timeLeft = INITIAL_TIME; // Reset the time for the new game, but don't restart the clock yet
+    createBingoBoard(); // Reset the bingo board
     updateTimer();
 
     const startButton = document.getElementById('start-game');
     if (startButton) {
-        startButton.textContent = 'Start Game';
+        startButton.textContent = 'Start Game'; // Keep it as 'Start Game' instead of 'Restart Game'
         startButton.removeEventListener('click', restartGame);
-        startButton.addEventListener('click', gameLoop);
+        startButton.addEventListener('click', gameLoop); // Attach gameLoop to start the game
     }
 
     if (panorama) {
@@ -262,6 +261,7 @@ function restartGame() {
 
     togglePlaceholderImage(true); // Show the placeholder image
 }
+
 
 function gameLoop() {
     if (gameInProgress) return;

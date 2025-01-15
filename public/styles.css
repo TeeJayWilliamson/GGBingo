@@ -34,6 +34,7 @@ body {
     z-index: 10; /* Ensures it stays on top of the Street View */
     max-width: 560px;
     transition: opacity 1.5s ease;
+    margin-top: -5%;
 }
 
 #logo.hidden {
