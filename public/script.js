@@ -3,8 +3,6 @@ let bingoItems = ['Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle
 let currentItems = [];
 let timer;
 let timeLeft = 30;
-require('dotenv').config();
-
 
 console.log("Script loaded");
 
@@ -55,8 +53,9 @@ function getRandomStreetView() {
     const lat = Math.random() * 170 - 85;
     const lng = Math.random() * 360 - 180;
     const sv = new google.maps.StreetViewService();
-    sv.getPanorama({location: {lat: lat, lng: lng}, radius: 50000}, processSVData);
+    sv.getPanorama({location: {lat: lat, lng: lng}, radius: 500000}, processSVData);
 }
+
 
 function processSVData(data, status) {
     if (status === 'OK') {
@@ -69,7 +68,7 @@ function processSVData(data, status) {
 
 function showStreetView(duration) {
     return new Promise(resolve => {
-        timeLeft = duration / 1000;
+        timeLeft = 30; // Set to 30 seconds
         updateTimer();
         timer = setInterval(() => {
             timeLeft--;
@@ -82,6 +81,7 @@ function showStreetView(duration) {
         }, 1000);
     });
 }
+
 
 function updateTimer() {
     document.getElementById('timer').textContent = `Time left: ${timeLeft}s`;
@@ -144,12 +144,12 @@ async function gameLoop() {
     console.log("gameLoop called");
     getRandomStreetView();
     panorama.setVisible(true);
-    await showStreetView(10000); // 10 seconds
+    await showStreetView(30000); // 30 seconds
     console.log("Street view finished");
     
-    // Store the timeout so it can be cleared if the game stops
     window.gameLoopTimeout = setTimeout(gameLoop, 2000);
 }
+
 
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -163,14 +163,6 @@ function gm_authFailure() {
     console.error("Google Maps failed to load!");
     alert("Failed to load Google Maps. Please check your API key and try again.");
 }
-
-app.get('/maps-api', (req, res) => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    console.log("API Key:", apiKey); // Log the API key for debugging
-    res.send(`
-        <script async src="https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initGame"></script>
-    `);
-});
 
 
 // Removed window.onload = initGame; as it's no longer needed
