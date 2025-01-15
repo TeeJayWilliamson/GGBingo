@@ -1,5 +1,5 @@
 let panorama;
-const INITIAL_TIME = 30;
+const INITIAL_TIME = 20;
 const bingoItems = [
     'Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle',
     'Traffic Light', 'Bus Stop', 'Bridge', 'Park', 'Restaurant',
@@ -105,11 +105,20 @@ function setTimer(duration) {
     timeLeft = Math.floor(duration / 1000);
     updateTimer();
     if (timer) clearInterval(timer);
+    
     timer = setInterval(() => {
+        if (!gameInProgress) {
+            clearInterval(timer);
+            return;
+        }
+        
         timeLeft--;
         updateTimer();
+        
         if (timeLeft <= 0) {
-            clearInterval(timer);
+            getRandomStreetView(); // Get new street view
+            timeLeft = INITIAL_TIME; // Reset timer
+            updateTimer();
         }
     }, 1000);
 }
@@ -117,13 +126,7 @@ function setTimer(duration) {
 function showStreetView(duration) {
     return new Promise(resolve => {
         setTimer(duration);
-        timer = setInterval(() => {
-            if (timeLeft <= 0) {
-                clearInterval(timer);
-                panorama.setVisible(false);
-                resolve();
-            }
-        }, 1000);
+        resolve(); // Resolve immediately to keep the game loop going
     });
 }
 
@@ -174,6 +177,8 @@ function stopGame() {
     }
     
     gameInProgress = false;
+    timeLeft = 0;
+    updateTimer();
     updateStartButton();
 }
 
@@ -187,6 +192,11 @@ function updateStartButton() {
 }
 
 function restartGame() {
+    if (timer) {
+        clearInterval(timer);
+        timer = null;
+    }
+    
     gameInProgress = false;
     timeLeft = INITIAL_TIME;
     createBingoBoard();
@@ -217,12 +227,7 @@ function gameLoop() {
     });
     
     getRandomStreetView();
-    
-    showStreetView(30000).then(() => {
-        console.log("Street view finished");
-        gameInProgress = false;
-        updateStartButton();
-    });
+    setTimer(20000); // Start initial timer
 }
 
 function shuffleArray(array) {
