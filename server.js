@@ -1,11 +1,12 @@
 const express = require('express');
 const dotenv = require('dotenv');
+const path = require('path');
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static('public')); // Serve static files from 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/maps-api', (req, res) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -17,3 +18,4 @@ app.get('/maps-api', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
+

@@ -3,6 +3,7 @@ let bingoItems = ['Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle
 let currentItems = [];
 let timer;
 let timeLeft = 30;
+let gameInProgress = false;
 
 console.log("Script loaded");
 
@@ -12,8 +13,6 @@ function initGame() {
     initializeStreetView();
     document.getElementById('start-game').addEventListener('click', gameLoop);
 }
-
-
 
 function createBingoBoard() {
     const board = document.getElementById('bingo-board');
@@ -48,27 +47,25 @@ function initializeStreetView() {
     );
 }
 
-
 function getRandomStreetView() {
-    const lat = Math.random() * 170 - 85;
-    const lng = Math.random() * 360 - 180;
+    const lat = (Math.random() * 170) - 85;
+    const lng = (Math.random() * 360) - 180;
     const sv = new google.maps.StreetViewService();
-    sv.getPanorama({location: {lat: lat, lng: lng}, radius: 500000}, processSVData);
-}
-
-
-function processSVData(data, status) {
-    if (status === 'OK') {
-        panorama.setPano(data.location.pano);
-    } else {
-        console.error('Street View data not found for this location.');
-        getRandomStreetView(); // Try again
-    }
+    sv.getPanorama({location: {lat: lat, lng: lng}, radius: 100000}, (data, status) => {
+        if (status === google.maps.StreetViewStatus.OK) {
+            panorama.setPano(data.location.pano);
+            panorama.setPov({heading: 270, pitch: 0});
+            panorama.setVisible(true);
+        } else {
+            console.error('Street View data not found for this location.');
+            getRandomStreetView(); // Try again
+        }
+    });
 }
 
 function showStreetView(duration) {
     return new Promise(resolve => {
-        timeLeft = 30; // Set to 30 seconds
+        timeLeft = duration / 1000;
         updateTimer();
         timer = setInterval(() => {
             timeLeft--;
@@ -81,7 +78,6 @@ function showStreetView(duration) {
         }, 1000);
     });
 }
-
 
 function updateTimer() {
     document.getElementById('timer').textContent = `Time left: ${timeLeft}s`;
@@ -101,55 +97,47 @@ function checkForBingo() {
 
     if (bingo) {
         alert('BINGO! You won!');
-        stopGame(); // New function to stop the game
+        stopGame();
     }
 }
 
 function stopGame() {
-    // Clear any existing game loop timeout
     clearTimeout(window.gameLoopTimeout);
-    
-    // Remove the click event listener from the start game button
     document.getElementById('start-game').removeEventListener('click', gameLoop);
-    
-    // Disable clicking on bingo cells
     const cells = document.querySelectorAll('.bingo-cell');
     cells.forEach(cell => {
-        cell.style.pointerEvents = 'none'; // Prevent further clicks
+        cell.style.pointerEvents = 'none';
     });
-    
-    // Clear the timer interval if it's running
     if (timer) {
         clearInterval(timer);
-        timer = null; // Reset timer variable
+        timer = null;
     }
-
-    // Optional: Add a restart button
-    const restartButton = document.createElement('button');
-    restartButton.textContent = 'Play Again';
-    restartButton.id = 'restart-game';
-    restartButton.addEventListener('click', () => {
-        location.reload(); // Reload the page to restart the game
-    });
-    
-    // Replace start game button with restart button
-    const startButton = document.getElementById('start-game');
-    startButton.parentNode.replaceChild(restartButton, startButton);
+    updateStartButton();
 }
 
+function updateStartButton() {
+    const startButton = document.getElementById('start-game');
+    startButton.textContent = 'Restart Game';
+    startButton.removeEventListener('click', gameLoop);
+    startButton.addEventListener('click', restartGame);
+}
 
+function restartGame() {
+    location.reload();
+}
 
-// Modify gameLoop to use a timeout that can be cleared
-async function gameLoop() {
+function gameLoop() {
+    if (gameInProgress) return;
+    gameInProgress = true;
     console.log("gameLoop called");
     getRandomStreetView();
     panorama.setVisible(true);
-    await showStreetView(30000); // 30 seconds
-    console.log("Street view finished");
-    
-    window.gameLoopTimeout = setTimeout(gameLoop, 2000);
+    showStreetView(30000).then(() => {
+        console.log("Street view finished");
+        gameInProgress = false;
+        updateStartButton();
+    });
 }
-
 
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -164,5 +152,5 @@ function gm_authFailure() {
     alert("Failed to load Google Maps. Please check your API key and try again.");
 }
 
-
-// Removed window.onload = initGame; as it's no longer needed
+// Initialize the game when the Google Maps API is loaded
+window.initGame = initGame;
