@@ -6,7 +6,20 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.17.1",
-    "dotenv": "^10.0.0"
-  }
+    "dotenv": "^10.0.0",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0"
+  },
+  "description": "��#\u0000 \u0000G\u0000G\u0000B\u0000i\u0000n\u0000g\u0000o\u0000\r\u0000 \u0000",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TeeJayWilliamson/GGBingo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TeeJayWilliamson/GGBingo/issues"
+  },
+  "homepage": "https://github.com/TeeJayWilliamson/GGBingo#readme"
 }

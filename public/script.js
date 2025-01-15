@@ -1,23 +1,40 @@
 let panorama;
-let bingoItems = ['Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle', 'Traffic Light', 'Bus Stop', 'Bridge', 'Park', 'Restaurant', 'School', 'Church', 'Hospital', 'Police Station', 'Fire Hydrant', 'Mailbox', 'Bench', 'Fountain', 'Statue', 'Flag', 'Crosswalk', 'Billboard', 'Parking Meter', 'Street Lamp'];
+const INITIAL_TIME = 30;
+const bingoItems = [
+    'Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle',
+    'Traffic Light', 'Bus Stop', 'Bridge', 'Park', 'Restaurant',
+    'School', 'Church', 'Hospital', 'Police Station', 'Fire Hydrant',
+    'Mailbox', 'Bench', 'Fountain', 'Statue', 'Flag',
+    'Crosswalk', 'Billboard', 'Parking Meter', 'Street Lamp'
+];
 let currentItems = [];
 let timer;
-let timeLeft = 30;
+let timeLeft = INITIAL_TIME;
 let gameInProgress = false;
 
 console.log("Script loaded");
 
 function initGame() {
     console.log("initGame called");
+    if (typeof google === 'undefined') {
+        console.error("Google Maps not loaded!");
+        return;
+    }
     createBingoBoard();
     initializeStreetView();
-    document.getElementById('start-game').addEventListener('click', gameLoop);
+    const startButton = document.getElementById('start-game');
+    startButton.removeEventListener('click', gameLoop);
+    startButton.addEventListener('click', gameLoop);
 }
 
 function createBingoBoard() {
     const board = document.getElementById('bingo-board');
+    if (!board) {
+        console.error("Bingo board element not found!");
+        return;
+    }
     board.innerHTML = '';
-    currentItems = shuffleArray(bingoItems).slice(0, 25);
+    currentItems = shuffleArray([...bingoItems]).slice(0, 25);
     currentItems.forEach(item => {
         const cell = document.createElement('div');
         cell.textContent = item;
@@ -28,30 +45,51 @@ function createBingoBoard() {
 }
 
 function toggleCell(cell) {
+    if (!gameInProgress) return;
     cell.classList.toggle('marked');
     checkForBingo();
 }
 
 function initializeStreetView() {
-    panorama = new google.maps.StreetViewPanorama(
-        document.getElementById('streetview-container'),
-        {
-            position: {lat: 37.869260, lng: -122.254811},
-            pov: {heading: 165, pitch: 0},
-            zoom: 1,
-            addressControl: false,
-            linksControl: false,
-            panControl: false,
-            enableCloseButton: false
+    try {
+        const streetviewContainer = document.getElementById('streetview-container');
+        if (!streetviewContainer) {
+            console.error("Streetview container not found!");
+            return;
         }
-    );
+        
+        panorama = new google.maps.StreetViewPanorama(
+            streetviewContainer,
+            {
+                position: {lat: 37.869260, lng: -122.254811},
+                pov: {heading: 165, pitch: 0},
+                zoom: 1,
+                addressControl: false,
+                linksControl: false,
+                panControl: false,
+                enableCloseButton: false
+            }
+        );
+        
+        panorama.addListener('status_changed', () => {
+            if (panorama.getStatus() !== google.maps.StreetViewStatus.OK) {
+                console.error('Failed to load Street View for current location');
+                getRandomStreetView();
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error initializing Street View:", error);
+    }
 }
 
 function getRandomStreetView() {
     const lat = (Math.random() * 170) - 85;
     const lng = (Math.random() * 360) - 180;
+    
     const sv = new google.maps.StreetViewService();
-    sv.getPanorama({location: {lat: lat, lng: lng}, radius: 100000}, (data, status) => {
+    
+    sv.getPanorama({location: {lat, lng}, radius: 100000}, (data, status) => {
         if (status === google.maps.StreetViewStatus.OK) {
             panorama.setPano(data.location.pano);
             panorama.setPov({heading: 270, pitch: 0});
@@ -63,13 +101,23 @@ function getRandomStreetView() {
     });
 }
 
+function setTimer(duration) {
+    timeLeft = Math.floor(duration / 1000);
+    updateTimer();
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+        timeLeft--;
+        updateTimer();
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+        }
+    }, 1000);
+}
+
 function showStreetView(duration) {
     return new Promise(resolve => {
-        timeLeft = duration / 1000;
-        updateTimer();
+        setTimer(duration);
         timer = setInterval(() => {
-            timeLeft--;
-            updateTimer();
             if (timeLeft <= 0) {
                 clearInterval(timer);
                 panorama.setVisible(false);
@@ -80,12 +128,16 @@ function showStreetView(duration) {
 }
 
 function updateTimer() {
-    document.getElementById('timer').textContent = `Time left: ${timeLeft}s`;
+    const timerElement = document.getElementById('timer');
+    if (timerElement) {
+        timerElement.textContent = `Time left: ${timeLeft}s`;
+    }
 }
 
 function checkForBingo() {
     const cells = Array.from(document.querySelectorAll('.bingo-cell'));
-    const rows = [0, 1, 2, 3, 4].map(i => cells.slice(i*5, (i+1)*5));
+    
+    const rows = [0, 1, 2, 3, 4].map(i => cells.slice(i * 5, (i + 1) * 5));
     const cols = [0, 1, 2, 3, 4].map(i => cells.filter((_, index) => index % 5 === i));
     const diags = [
         [cells[0], cells[6], cells[12], cells[18], cells[24]],
@@ -102,36 +154,70 @@ function checkForBingo() {
 }
 
 function stopGame() {
-    clearTimeout(window.gameLoopTimeout);
-    document.getElementById('start-game').removeEventListener('click', gameLoop);
+    if (window.gameLoopTimeout) {
+        clearTimeout(window.gameLoopTimeout);
+    }
+    
+    const startButton = document.getElementById('start-game');
+    if (startButton) {
+        startButton.removeEventListener('click', gameLoop);
+    }
+    
     const cells = document.querySelectorAll('.bingo-cell');
     cells.forEach(cell => {
         cell.style.pointerEvents = 'none';
     });
+    
     if (timer) {
         clearInterval(timer);
         timer = null;
     }
+    
+    gameInProgress = false;
     updateStartButton();
 }
 
 function updateStartButton() {
     const startButton = document.getElementById('start-game');
+    if (!startButton) return;
+    
     startButton.textContent = 'Restart Game';
     startButton.removeEventListener('click', gameLoop);
     startButton.addEventListener('click', restartGame);
 }
 
 function restartGame() {
-    location.reload();
+    gameInProgress = false;
+    timeLeft = INITIAL_TIME;
+    createBingoBoard();
+    updateTimer();
+    
+    const startButton = document.getElementById('start-game');
+    if (startButton) {
+        startButton.textContent = 'Start Game';
+        startButton.removeEventListener('click', restartGame);
+        startButton.addEventListener('click', gameLoop);
+    }
+    
+    if (panorama) {
+        panorama.setVisible(false);
+    }
 }
 
 function gameLoop() {
     if (gameInProgress) return;
+    
     gameInProgress = true;
     console.log("gameLoop called");
+    
+    const cells = document.querySelectorAll('.bingo-cell');
+    cells.forEach(cell => {
+        cell.style.pointerEvents = 'auto';
+        cell.classList.remove('marked');
+    });
+    
     getRandomStreetView();
-    panorama.setVisible(true);
+    
     showStreetView(30000).then(() => {
         console.log("Street view finished");
         gameInProgress = false;
@@ -140,11 +226,12 @@ function gameLoop() {
 }
 
 function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
-    return array;
+    return newArray;
 }
 
 function gm_authFailure() {
