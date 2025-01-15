@@ -32,9 +32,9 @@ body {
 #logo {
     position: absolute;
     z-index: 10; /* Ensures it stays on top of the Street View */
-    max-width: 560px;
+    max-width: 660px;
     transition: opacity 1.5s ease;
-    margin-top: -5%;
+    margin-top: -15%;
     margin-left: -8%;
 }
 

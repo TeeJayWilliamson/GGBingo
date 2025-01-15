@@ -1,16 +1,12 @@
 let panorama;
 const INITIAL_TIME = 20;
 const bingoItems = [
-    'On a Boat', 'Inside', 'Trees', 'Hotel', 'Streetview Car Shadow', 
-    'Beach', 'Cemetery', 'Car', 'Moped', 'Bicycle', 'Swimming Pool', 
-    'Playground', 'Cruise Ship', 'Bridge', 'Animal', 'Airplane', 
-    'Birds Eye View', 'Flag', 'Stop Sign', 'Lighthouse', 'Hospital', 
-    'Church', 'Waterfall', 'Mountains', 'Billboard', 'Police Station', 
-    'Fountain', 'Mailbox', 'Black Screen (Whoops Sorry!)', 'Statue', 
-    'Traffic Lights', 'Graffiti', 'Ice Cream Truck', 'Windmill', 
-    'Restaurant', 'Birds', 'Snow', 'Walking a Dog'
+    'Car', 'Tree', 'Building', 'Road Sign', 'Pedestrian', 'Bicycle',
+    'Traffic Light', 'Bus Stop', 'Bridge', 'Park', 'Restaurant',
+    'School', 'Church', 'Hospital', 'Police Station', 'Fire Hydrant',
+    'Mailbox', 'Bench', 'Fountain', 'Statue', 'Flag',
+    'Crosswalk', 'Billboard', 'Parking Meter', 'Street Lamp'
 ];
-
 let currentItems = [];
 let timer;
 let timeLeft = INITIAL_TIME;
