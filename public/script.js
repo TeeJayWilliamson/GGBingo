@@ -109,17 +109,26 @@ function initializeStreetView() {
             return;
         }
         
+        // Configure StreetView with motion tracking disabled
+        const streetViewOptions = {
+            position: {lat: 37.869260, lng: -122.254811},
+            pov: {heading: 165, pitch: 0},
+            zoom: 1,
+            addressControl: false,
+            linksControl: false,
+            panControl: false,
+            enableCloseButton: false,
+            motionTracking: false,         // Disable motion tracking by default
+            motionTrackingControl: false,  // Hide the motion tracking toggle
+            scrollwheel: true,             // Enable zoom with scroll/pinch
+            gestureHandling: 'greedy',     // Make gestures easier on mobile
+            clickToGo: true,               // Enable click-to-move
+            draggable: true                // Enable touch drag to look around
+        };
+        
         panorama = new google.maps.StreetViewPanorama(
             streetviewContainer,
-            {
-                position: {lat: 37.869260, lng: -122.254811},
-                pov: {heading: 165, pitch: 0},
-                zoom: 1,
-                addressControl: false,
-                linksControl: false,
-                panControl: false,
-                enableCloseButton: false
-            }
+            streetViewOptions
         );
         
         panorama.addListener('status_changed', () => {
@@ -128,6 +137,19 @@ function initializeStreetView() {
                 getRandomStreetView();
             }
         });
+        
+        // Optional: Add a media query listener to adjust settings based on screen size
+        const mediaQuery = window.matchMedia('(max-width: 1024px)');
+        function handleScreenSizeChange(e) {
+            if (panorama) {
+                // Ensure motion tracking stays disabled on mobile
+                panorama.setOptions({
+                    motionTracking: false,
+                    motionTrackingControl: false
+                });
+            }
+        }
+        mediaQuery.addListener(handleScreenSizeChange);
         
     } catch (error) {
         console.error("Error initializing Street View:", error);
