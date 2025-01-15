@@ -125,10 +125,52 @@ body {
     #streetview-container {
         width: 100%;
         height: 300px; /* Adjusted for better mobile view */
+        max-width: 550px;
     }
 
     #bingo-board {
         width: 100%;
-        max-width: 300px;
+        max-width: 550px;
     }
+}
+
+@media screen and (max-width: 768px) {
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .streetview {
+    order: 1;
+    width: 100%;
+    max-width: 350px;
+    height: 50vh; /* Adjust as needed */
+  }
+
+  .timer {
+    order: 2;
+    margin: 10px 0;
+  }
+
+  #bingo-board {
+    width: 100%;
+    max-width: 350px;
+}
+
+  .bingo-card {
+    grid-template-columns: repeat(5, 1fr); /* Maintain 5 columns */
+    gap: 3px; /* Reduce gap for smaller screens */
+  }
+
+  .bingo-cell {
+    font-size: 0.65rem; /* Reduce font size for smaller cells */
+    max-width: 35px;
+    max-height: 35px;
+  }
+
+  button {
+    display: block;
+    margin: 0 auto;
+  }
 }
