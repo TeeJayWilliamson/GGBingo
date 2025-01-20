@@ -47,7 +47,13 @@ app.use(
                     "'unsafe-eval'",
                     "https://maps.googleapis.com",
                     "https://maps.gstatic.com",
+                    "https://cdn.jsdelivr.net/npm/sweetalert2@11", // Add this line
                     "http://localhost:3000"
+                ],
+                styleSrc: [
+                    "'self'", 
+                    "'unsafe-inline'", 
+                    "https://cdn.jsdelivr.net/npm/sweetalert2@11"
                 ],
                 styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
                 imgSrc: ["'self'", "https:", "data:", "blob:"],
@@ -197,19 +203,27 @@ io.on('connection', (socket) => {
     });
 
     // Handle game start
-    socket.on('startGame', (roomCode) => {
-        console.log(`Attempt to start game in room ${roomCode}`);
-        const room = rooms[roomCode];
-        if (room && room.players.length > 0) {  // Changed to allow single player for testing
-            room.isGameStarted = true;
-            room.lastActive = Date.now();
-            io.to(roomCode).emit('gameStarted');
-            console.log(`Game started in room ${roomCode}`);
-        } else {
-            console.log(`Failed to start game in room ${roomCode} - insufficient players`);
-            socket.emit('roomError', 'Not enough players to start game');
-        }
+socket.on('startGame', (roomCode) => {
+    console.log(`Attempt to start game in room ${roomCode}`);
+    const room = rooms[roomCode];
+    if (room && room.players.length > 0) {
+        room.isGameStarted = true;
+        // Broadcast game start to ALL players in the room
+        io.to(roomCode).emit('gameStarted');
+        console.log(`Game started in room ${roomCode}`);
+    }
+});
+
+socket.on('playerBingo', ({ roomCode, username }) => {
+    console.log(`Bingo called in room ${roomCode} by ${username}`);
+    // Broadcast to ALL players in the room
+    io.to(roomCode).emit('bingoAnnouncement', {
+        winner: username,
+        roomCode
     });
+});
+
+
 
     // Handle disconnections
     socket.on('disconnect', () => {

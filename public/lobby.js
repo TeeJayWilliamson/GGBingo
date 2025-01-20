@@ -60,10 +60,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Redirect to game page when the game starts
     socket.on('gameStarted', () => {
-        console.log('Game started event received');
-        alert('The game has started!');
-        window.location.href = 'game.html';
-    });
+      console.log('Game started event received');
+      alert('The game has started!');
+      window.location.href = 'game.html';
+  });
+  
 });
 
 function updateUI() {

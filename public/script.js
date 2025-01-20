@@ -241,21 +241,168 @@ function updateTimer() {
 function checkForBingo() {
     const cells = Array.from(document.querySelectorAll('.bingo-cell'));
     
-    const rows = [0, 1, 2, 3, 4].map(i => cells.slice(i * 5, (i + 1) * 5));
-    const cols = [0, 1, 2, 3, 4].map(i => cells.filter((_, index) => index % 5 === i));
-    const diags = [
-        [cells[0], cells[6], cells[12], cells[18], cells[24]],
-        [cells[4], cells[8], cells[12], cells[16], cells[20]]
+    // Define all possible winning lines
+    const rows = [
+        [0, 1, 2, 3, 4],
+        [5, 6, 7, 8, 9],
+        [10, 11, 12, 13, 14],
+        [15, 16, 17, 18, 19],
+        [20, 21, 22, 23, 24]
     ];
 
-    const lines = [...rows, ...cols, ...diags];
-    const bingo = lines.some(line => line.every(cell => cell.classList.contains('marked')));
+    const cols = [
+        [0, 5, 10, 15, 20],
+        [1, 6, 11, 16, 21],
+        [2, 7, 12, 17, 22],
+        [3, 8, 13, 18, 23],
+        [4, 9, 14, 19, 24]
+    ];
+
+    const diags = [
+        [0, 6, 12, 18, 24],  // Top-left to bottom-right
+        [4, 8, 12, 16, 20]   // Top-right to bottom-left
+    ];
+
+    // Combine all possible winning lines
+    const winningLines = [...rows, ...cols, ...diags];
+
+    // Check each winning line
+    const bingo = winningLines.some(line => 
+        line.every(index => cells[index].classList.contains('marked'))
+    );
 
     if (bingo) {
-        alert('BINGO! You won!');
+        const username = localStorage.getItem('username');
+        const roomCode = localStorage.getItem('roomCode');
+
+        // Comprehensive socket validation
+        if (typeof socket !== 'undefined' && socket) {
+            try {
+                socket.emit('playerBingo', { roomCode, username });
+                console.log('Bingo event emitted successfully');
+            } catch (error) {
+                console.error('Error emitting bingo event:', error);
+            }
+        } else {
+            console.error('Socket is not initialized');
+        }
+        
+        return true;  // Explicitly return true for bingo
+    }
+
+    return false;  // No bingo
+}
+
+
+// Modify toggleCell to use the return value
+function toggleCell(cell) {
+    if (!gameInProgress) return;
+    cell.classList.toggle('marked');
+    
+    // If checkForBingo returns true, the game stops
+    if (checkForBingo()) {
         stopGame();
     }
 }
+
+
+function showToast(message) {
+    // Create container if it doesn't exist
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.classList.add('toast-container');
+        document.body.appendChild(container);
+    }
+
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.classList.add('toast');
+    toast.textContent = message;
+    
+    // Add to container
+    container.appendChild(toast);
+    
+    // Remove toast after animation
+    setTimeout(() => {
+        toast.remove();
+        
+        // Remove container if no toasts left
+        if (container.children.length === 0) {
+            container.remove();
+        }
+    }, 5000);
+}
+
+socket.on('bingoAnnouncement', ({ winner, roomCode }) => {
+    showToast(`${winner} has won the Bingo game!`);
+    stopGame();
+});
+
+
+
+
+
+// Modify getRandomStreetView to use a seeded random for consistent views
+function getRandomStreetView(seed) {
+    // Use the seed to generate consistent random locations for all players
+    function seededRandom(seed) {
+        const x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+    }
+
+    const seedValue = seed || Date.now();
+    const lat = (seededRandom(seedValue) * 170) - 85;
+    const lng = (seededRandom(seedValue + 1) * 360) - 180;
+    
+    const sv = new google.maps.StreetViewService();
+    
+    sv.getPanorama({location: {lat, lng}, radius: 100000}, (data, status) => {
+        if (status === google.maps.StreetViewStatus.OK) {
+            panorama.setPano(data.location.pano);
+            panorama.setPov({heading: 270, pitch: 0});
+            panorama.setVisible(true);
+        } else {
+            console.error('Street View data not found for this location.');
+            getRandomStreetView(seedValue + 1); // Try again with a different seed
+        }
+    });
+}
+
+// Modify gameLoop to use a consistent seed
+function gameLoop() {
+    if (gameInProgress) return;
+  
+    gameInProgress = true;
+    console.log("gameLoop called");
+  
+    createBingoBoard();
+    togglePlaceholderImage(false);
+
+    const cells = document.querySelectorAll('.bingo-cell');
+    cells.forEach(cell => {
+        cell.style.pointerEvents = 'auto';
+        cell.classList.remove('marked');
+    });
+
+    // Use room code as seed for consistent random location
+    const roomCode = localStorage.getItem('roomCode');
+    const seed = roomCode ? hashCode(roomCode) : Date.now();
+    getRandomStreetView(seed);
+    setTimer(30000);
+}
+
+// Helper function to generate consistent hash from room code
+function hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+}
+
 
 function stopGame() {
     if (window.gameLoopTimeout) {
