@@ -1,0 +1,118 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    color: #333;
+}
+
+#lobby-container {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    padding: 40px;
+    width: 400px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+h2 {
+    color: #667eea;
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+#room-code {
+    color: #5a67d8;
+    font-weight: bold;
+    letter-spacing: 2px;
+    background-color: #f0f4f8;
+    padding: 5px 10px;
+    border-radius: 6px;
+}
+
+h3 {
+    color: #667eea;
+    margin-bottom: 15px;
+}
+
+#player-list {
+    list-style-type: none;
+    padding: 0;
+    max-height: 250px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+#player-list li {
+    background-color: #e9ecef;
+    margin: 8px 0;
+    padding: 12px;
+    border-radius: 6px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#player-list li:hover {
+    background-color: #dee2e6;
+    transform: scale(1.02);
+}
+
+#start-game {
+    width: 100%;
+    padding: 12px;
+    background-color: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+}
+
+#start-game:hover {
+    background-color: #5a67d8;
+}
+
+#start-game:active {
+    transform: scale(0.98);
+}
+
+#start-game:disabled {
+    background-color: #a0aec0;
+    cursor: not-allowed;
+}
+
+/* Scrollbar styling for player list */
+#player-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#player-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+#player-list::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 10px;
+}
+
+#player-list::-webkit-scrollbar-thumb:hover {
+    background: #5a67d8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 500px) {
+    #lobby-container {
+        width: 90%;
+        padding: 20px;
+    }
+}

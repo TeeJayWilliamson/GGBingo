@@ -3,24 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuessr Bingo</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>GGBingo - Landing</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="landing.js"></script>
+    <link rel="stylesheet" href="/landing-styles.css">
 </head>
 <body>
-    <div id="game-container">
-        <div id="streetview-container">
-            <img id="logo" src="./img/GGBingo Logo.png" alt="Logo">
+    <div id="landing-container">
+        <h1>B - I - N - Geo</h1>
+        <input type="text" id="username" placeholder="Enter username" maxlength="12">
+        <button id="create-room">Create Room</button>
+        <div>
+            <input type="text" id="room-code-input" placeholder="Enter room code">
+            <button id="join-room">Join Room</button>
         </div>
-        
-        <div id="bingo-board"></div>
     </div>
-    <div class="controls-container">
-        <div id="timer">Time left: 20s</div>
-        <button id="start-game">Start Game</button>
-    </div>
-    
-    <!-- Load scripts -->
-    <script src="script.js"></script>
-    <script src="/maps-api"></script>
 </body>
 </html>

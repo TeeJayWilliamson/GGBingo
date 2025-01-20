@@ -1,5 +1,5 @@
 let panorama;
-const INITIAL_TIME = 20;
+const INITIAL_TIME = 30;
 const bingoItems = [
     'On a Boat', 'Inside', 'Trees', 'Hotel', 'Streetview Car Shadow', 
     'Beach', 'Cemetery', 'Car', 'Moped', 'Bicycle', 'Swimming Pool', 
@@ -15,68 +15,99 @@ let currentItems = [];
 let timer;
 let timeLeft = INITIAL_TIME;
 let gameInProgress = false;
+let socket;
 
 console.log("Script loaded");
 
 function initGame() {
     console.log("initGame called");
-    if (typeof google === 'undefined') {
+    if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
         console.error("Google Maps not loaded!");
         return;
     }
-    togglePlaceholderImage(true); // Show the placeholder image initially
+    togglePlaceholderImage(true);
     createBingoBoard();
     initializeStreetView();
+    initializeSocket();
+}
 
-    const startButton = document.getElementById('start-game');
-    startButton.removeEventListener('click', gameLoop);
-    startButton.addEventListener('click', gameLoop);
+function initializeSocket() {
+    socket = io('http://localhost:3000');
+
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+
+    socket.on('updatePlayers', (players) => {
+        updatePlayerList(players);
+    });
+
+    socket.on('gameStarted', () => {
+        gameLoop();
+    });
+}
+
+function updatePlayerList(players) {
+    const listContainer = document.getElementById('player-list');
+    if (listContainer) {
+        listContainer.innerHTML = '';
+        players.forEach((player) => {
+            const li = document.createElement('li');
+            li.textContent = player;
+            listContainer.appendChild(li);
+        });
+    }
+}
+
+function startGame() {
+    const roomCode = localStorage.getItem('roomCode');
+    const isCreator = localStorage.getItem('isCreator') === 'true';
+
+    if (isCreator) {
+        socket.emit('startGame', roomCode);
+    } else {
+        alert('Only the room creator can start the game.');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const logo = document.getElementById('logo');
-    const startGameButton = document.getElementById('start-game'); // "Start Game" button
-    let gameStarted = false; // Flag to track if the game has started
+    const startGameButton = document.getElementById('start-game');
+    let gameStarted = false;
 
-    // Function to hide the logo
     function hideLogo() {
         if (logo) {
             console.log("Hiding logo");
-            logo.classList.add('hidden'); // Add the 'hidden' class to fade out the logo
+            logo.classList.add('hidden');
         }
     }
 
-    // Function to show the logo
     function showLogo() {
         if (logo) {
             console.log("Showing logo");
-            logo.classList.remove('hidden'); // Remove the 'hidden' class to bring the logo back
+            logo.classList.remove('hidden');
         }
     }
 
-    // Event listener for "Start Game" / "Restart Game"
     startGameButton.addEventListener('click', () => {
         if (!gameStarted) {
             console.log("Start Game clicked");
-            hideLogo(); // Hide the logo when the game starts
-            gameStarted = true; // Set the flag to true indicating the game has started
-            startGameButton.textContent = 'Restart Game'; // Change button text to "Restart Game"
-        
-            gameLoop(); // Start the game logic here
+            hideLogo();
+            gameStarted = true;
+            startGameButton.textContent = 'Restart Game';
+            gameLoop(); // Directly call gameLoop instead of startGame
         } else {
             console.log("Restart Game clicked");
-            showLogo(); // Show the logo when restarting the game
-        
-            // Reset the game state and stop the current game loop (if needed)
-            restartGame(); // Now stops the game and resets it
-        
-            gameStarted = false; // Reset the game state
-            startGameButton.textContent = 'Start Game'; // Change button text back to "Start Game"
+            showLogo();
+            restartGame();
+            gameStarted = false;
+            startGameButton.textContent = 'Start Game';
         }
     });
-    
-    
+
+    initGame(); // Keep this to ensure initial setup
 });
+
 
 function createBingoBoard() {
     const board = document.getElementById('bingo-board');
@@ -102,11 +133,11 @@ function toggleCell(cell) {
 }
 
 function initializeStreetView() {
+    console.log("Initializing Street View");
     try {
         const streetviewContainer = document.getElementById('streetview-container');
         if (!streetviewContainer) {
-            console.error("Streetview container not found!");
-            return;
+            throw new Error("Streetview container not found!");
         }
         
         panorama = new google.maps.StreetViewPanorama(
@@ -118,32 +149,38 @@ function initializeStreetView() {
                 addressControl: false,
                 linksControl: false,
                 panControl: false,
-                enableCloseButton: false
+                enableCloseButton: false,
+                motionTracking: false,
+                motionTrackingControl: false
             }
         );
         
         panorama.addListener('status_changed', () => {
             if (panorama.getStatus() !== google.maps.StreetViewStatus.OK) {
-                console.error('Failed to load Street View for current location');
+                console.warn('Failed to load Street View for current location. Attempting to get a random view.');
                 getRandomStreetView();
+            } else {
+                console.log('Street View loaded successfully');
             }
         });
 
-                // Optional: Add a media query listener to adjust settings based on screen size
-                const mediaQuery = window.matchMedia('(max-width: 1024px)');
-                function handleScreenSizeChange(e) {
-                    if (panorama) {
-                        // Ensure motion tracking stays disabled on mobile
-                        panorama.setOptions({
-                            motionTracking: false,
-                            motionTrackingControl: false
-                        });
-                    }
-                }
-                mediaQuery.addListener(handleScreenSizeChange);
-        
+        const mediaQuery = window.matchMedia('(max-width: 1024px)');
+        function handleScreenSizeChange(e) {
+            if (panorama) {
+                panorama.setOptions({
+                    motionTracking: false,
+                    motionTrackingControl: false
+                });
+                console.log('Applied mobile-specific Street View settings');
+            }
+        }
+        mediaQuery.addListener(handleScreenSizeChange);
+        handleScreenSizeChange(mediaQuery); // Apply settings immediately
+
+        console.log("Street View initialization complete");
     } catch (error) {
-        console.error("Error initializing Street View:", error);
+        console.error("Error initializing Street View:", error.message);
+        alert("Failed to initialize Street View. Please refresh the page and try again.");
     }
 }
 
@@ -186,7 +223,6 @@ function setTimer(duration) {
         }
     }, 1000); // Update every second
 }
-
 
 function showStreetView(duration) {
     return new Promise(resolve => {
@@ -279,29 +315,24 @@ function restartGame() {
     togglePlaceholderImage(true); // Show the placeholder image
 }
 
-
-
-
-
 function gameLoop() {
-    if (gameInProgress) return; // Don't start a new game if one is already in progress
-
+    if (gameInProgress) return;
+  
     gameInProgress = true;
     console.log("gameLoop called");
+  
+    createBingoBoard();
+    togglePlaceholderImage(false);
 
-    togglePlaceholderImage(false); // Hide the placeholder image
-
-    // Reset the bingo board and allow user interaction
     const cells = document.querySelectorAll('.bingo-cell');
     cells.forEach(cell => {
-        cell.style.pointerEvents = 'auto'; // Enable clicks
-        cell.classList.remove('marked'); // Reset markings
+        cell.style.pointerEvents = 'auto';
+        cell.classList.remove('marked');
     });
 
-    getRandomStreetView(); // Get a random street view
-    setTimer(20000); // Start the timer with 20 seconds
+    getRandomStreetView();
+    setTimer(30000);
 }
-
 
 function shuffleArray(array) {
     const newArray = [...array];
@@ -318,11 +349,8 @@ function gm_authFailure() {
 }
 
 function togglePlaceholderImage(show) {
-    const placeholderImage = document.getElementById('./img/GGBingo Logo.png');
+    const placeholderImage = document.getElementById('logo');
     if (placeholderImage) {
         placeholderImage.style.display = show ? 'block' : 'none';
     }
 }
-
-// Initialize the game when the Google Maps API is loaded
-window.initGame = initGame;

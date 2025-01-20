@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGBingo - Lobby</title>
+    <!-- Add Socket.IO client script BEFORE your lobby.js -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="lobby.js"></script>
+    <link rel="stylesheet" href="/lobby-styles.css">
+</head>
+<body>
+    <div id="lobby-container">
+        <h2>Room Code: <span id="room-code"></span></h2>
+        <div>
+            <h3>Players:</h3>
+            <ul id="player-list"></ul>
+        </div>
+        <button id="start-game">Start Game</button>
+    </div>
+</body>
+</html>

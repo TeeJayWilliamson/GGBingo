@@ -127,6 +127,37 @@ body {
     text-align: center;
 }
 
+/* Room actions styling */
+.room-actions {
+    text-align: center;
+    margin: 20px;
+  }
+  
+  #room-input {
+    margin: 10px;
+    padding: 8px;
+    font-size: 16px;
+  }
+  
+  .hidden {
+    display: none;
+  }
+
+  .hidden {
+    display: none;
+  }
+  
+  #room-code-container {
+    margin-top: 20px;
+  }
+  
+  input {
+    padding: 10px;
+    margin-right: 10px;
+  }
+  
+  
+
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
