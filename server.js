@@ -6,20 +6,19 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 
+const app = express();
+const server = http.createServer(app);
+
 // Load environment variables
 dotenv.config();
 
-// Initialize express
-const app = express();
+
 
 // Add CORS middleware
 app.use(cors());
 
 // Serve static files BEFORE other middleware
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Create HTTP server
-const server = http.createServer(app);
 
 // Define allowed origins
 const allowedOrigins = [
@@ -31,8 +30,8 @@ const allowedOrigins = [
 // Configure Socket.IO with dynamic CORS
 const io = socketIo(server, {
     cors: {
-        origin: function (origin, callback) {
-            if (!origin || allowedOrigins.includes(origin)) {
+        origin: function(origin, callback) {
+            if (!origin || allowedOrigins.indexOf(origin) !== -1) {
                 callback(null, true);
             } else {
                 callback(new Error('Not allowed by CORS'));
@@ -40,10 +39,14 @@ const io = socketIo(server, {
         },
         methods: ["GET", "POST"],
         credentials: true
-    }
+    },
+    transports: ['websocket', 'polling']
 });
 
 const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
 
 // Configure CORS for Express
 app.use(cors({

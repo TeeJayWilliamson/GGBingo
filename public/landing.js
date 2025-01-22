@@ -1,4 +1,19 @@
-const socket = io('http://localhost:3000');
+import { config } from './config.js';
+const socket = io(config.URL, {
+    withCredentials: true,
+    transports: ['websocket', 'polling']
+});
+
+// Add error handling
+socket.on('connect_error', (error) => {
+  console.error('Socket connection error:', error);
+  alert('Unable to connect to game server. Please try again later.');
+});
+
+const SOCKET_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000'
+    : 'https://ggbingo.onrender.com';  // Your production URL
+
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('create-room').addEventListener('click', () => {
