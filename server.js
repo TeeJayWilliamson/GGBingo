@@ -9,6 +9,14 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error('Port is already in use');
+    } else {
+      console.error('An error occurred:', error);
+    }
+  });
+
 // Load environment variables
 dotenv.config();
 
@@ -44,11 +52,8 @@ const io = socketIo(server, {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
 
-// Configure CORS for Express
+// Configure CORS for Express (keep this part where it is in your middleware setup)
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) {
@@ -59,6 +64,30 @@ app.use(cors({
     },
     credentials: true
 }));
+
+// Error handling middleware (keep this where it is in your middleware chain)
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
+});
+
+// Start server (place this at the end of your file)
+server.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+}).on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use`);
+    } else {
+        console.error('Server error:', error);
+    }
+});
+
+// Handle process errors (keep this at the end of your file)
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Optionally, you might want to exit the process after logging
+    // process.exit(1);
+});
 
 // Configure Helmet security middleware
 // Update Helmet CSP
@@ -296,13 +325,6 @@ setInterval(() => {
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Something broke!');
-});
-
-// Start server
-server.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-}).on('error', (error) => {
-    console.error('Server error:', error);
 });
 
 // Handle process errors
