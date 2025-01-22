@@ -21,10 +21,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Create HTTP server
 const server = http.createServer(app);
 
-// Configure Socket.IO with CORS
+// Define allowed origins
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://ggbingo.onrender.com'  // Add your production URL
+];
+
+// Configure Socket.IO with dynamic CORS
 const io = socketIo(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: function (origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -32,10 +45,20 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Add CORS middleware
-app.use(cors());
+// Configure CORS for Express
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 
 // Configure Helmet security middleware
+// Update Helmet CSP
 app.use(
     helmet({
         contentSecurityPolicy: {
@@ -47,27 +70,16 @@ app.use(
                     "'unsafe-eval'",
                     "https://maps.googleapis.com",
                     "https://maps.gstatic.com",
-                    "https://cdn.jsdelivr.net/npm/sweetalert2@11", // Add this line
-                    "http://localhost:3000"
+                    "https://ggbingo.onrender.com"  // Add your production URL
                 ],
-                styleSrc: [
-                    "'self'", 
-                    "'unsafe-inline'", 
-                    "https://cdn.jsdelivr.net/npm/sweetalert2@11"
-                ],
-                styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-                imgSrc: ["'self'", "https:", "data:", "blob:"],
                 connectSrc: [
                     "'self'", 
                     "https://*.googleapis.com",
                     "ws://localhost:3000",
-                    "http://localhost:3000"
+                    "wss://ggbingo.onrender.com",  // Add WebSocket for production
+                    "https://ggbingo.onrender.com"  // Add your production URL
                 ],
-                fontSrc: ["'self'", "https://fonts.gstatic.com"],
-                objectSrc: ["'none'"],
-                mediaSrc: ["'none'"],
-                frameSrc: ["'none'"],
-                workerSrc: ["'self'"]
+                // ... rest of your CSP config ...
             },
         },
         crossOriginEmbedderPolicy: false

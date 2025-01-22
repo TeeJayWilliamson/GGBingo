@@ -1,4 +1,8 @@
-const socket = io('http://localhost:3000');
+const SOCKET_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000'
+    : 'https://ggbingo.onrender.com';  // Your production URL
+
+const socket = io(SOCKET_URL);
 
 let currentRoom = {
     roomCode: null,
