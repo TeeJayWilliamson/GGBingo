@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuessr Bingo</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="config.js" type="module"></script>
-    <script src="game.js" type="module"></script>
+    <title>B-I-N-Geo</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,12 +14,17 @@
         
         <div id="bingo-board" aria-label="Bingo Game Board"></div>
     </div>
+    
     <div class="controls-container">
         <div id="timer" aria-live="polite">Time left: 30s</div>
         <button id="start-game" aria-label="Start Game">Start Game</button>
     </div>
-    
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_hkv9NkNWUzNw23hx8b5qJ6DnuX1R35c&callback=initGame" async defer></script>
-    <script src="script.js" defer></script>
+
+    <!-- Load scripts in the correct order -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_hkv9NkNWUzNw23hx8b5qJ6DnuX1R35c&libraries=places&callback=initMap">
+    </script>
 </body>
 </html>

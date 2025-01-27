@@ -66,12 +66,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Redirect to game page when the game starts
-    socket.on('gameStarted', () => {
-      console.log('Game started event received');
-      alert('The game has started!');
-      window.location.href = 'game.html';
-  });
+    socket.on('gameStarted', (data) => {
+        console.log('Game started event received', data);
+        
+        // Automatically redirect after a short delay
+        setTimeout(() => {
+            window.location.href = 'game.html';
+        }, 2000);
+        
+        // Optional: Show a brief toast/notification
+        const notification = document.createElement('div');
+        notification.textContent = 'Game is starting...';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.left = '50%';
+        notification.style.transform = 'translateX(-50%)';
+        notification.style.backgroundColor = 'green';
+        notification.style.color = 'white';
+        notification.style.padding = '10px';
+        notification.style.borderRadius = '5px';
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 2000);
+    });
   
 });
 

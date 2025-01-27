@@ -1,6 +1,14 @@
-let panorama;
-const INITIAL_TIME = 30;
-const bingoItems = [
+// Constants and Configuration
+const CONFIG = {
+    INITIAL_TIME: 30,
+    API_KEY: 'AIzaSyA_hkv9NkNWUzNw23hx8b5qJ6DnuX1R35c',
+    SOCKET_URL: 'http://localhost:3000',
+    PING_INTERVAL: 25000,
+    MAX_RETRY_ATTEMPTS: 3,
+    RETRY_DELAY: 2000
+};
+
+const BINGO_ITEMS = [
     'On a Boat', 'Inside', 'Trees', 'Hotel', 'Streetview Car Shadow', 
     'Beach', 'Cemetery', 'Car', 'Moped', 'Bicycle', 'Swimming Pool', 
     'Playground', 'Cruise Ship', 'Bridge', 'Animal', 'Airplane', 
@@ -11,493 +19,534 @@ const bingoItems = [
     'Restaurant', 'Birds', 'Snow', 'Walking a Dog', 'Pedestrian'
 ];
 
-let currentItems = [];
-let timer;
-let timeLeft = INITIAL_TIME;
-let gameInProgress = false;
-let socket;
+// Game State
+const GameState = {
+    panorama: null,
+    currentItems: [],
+    timer: null,
+    timeLeft: CONFIG.INITIAL_TIME,
+    gameInProgress: false,
+    socket: null,
+    gameInitialized: false,
+    locationQueue: [],
+    isPreloading: false,
+    minimumQueueSize: 3
+};
 
-console.log("Script loaded");
+const LocationQueue = {
+    usedPanoramas: new Set(),
 
-function initGame() {
-    console.log("initGame called");
-    if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
-        console.error("Google Maps not loaded!");
-        return;
-    }
-    togglePlaceholderImage(true);
-    createBingoBoard();
-    initializeStreetView();
-    initializeSocket();
-}
+    async preloadLocations(count = 10) {
+        if (GameState.isPreloading) return;
+        GameState.isPreloading = true;
 
-function initializeSocket() {
-    socket = io('http://localhost:3000');
-
-    socket.on('connect', () => {
-        console.log('Connected to server');
-    });
-
-    socket.on('updatePlayers', (players) => {
-        updatePlayerList(players);
-    });
-
-    socket.on('gameStarted', () => {
-        gameLoop();
-    });
-}
-
-function updatePlayerList(players) {
-    const listContainer = document.getElementById('player-list');
-    if (listContainer) {
-        listContainer.innerHTML = '';
-        players.forEach((player) => {
-            const li = document.createElement('li');
-            li.textContent = player;
-            listContainer.appendChild(li);
-        });
-    }
-}
-
-function startGame() {
-    const roomCode = localStorage.getItem('roomCode');
-    const isCreator = localStorage.getItem('isCreator') === 'true';
-
-    if (isCreator) {
-        socket.emit('startGame', roomCode);
-    } else {
-        alert('Only the room creator can start the game.');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const logo = document.getElementById('logo');
-    const startGameButton = document.getElementById('start-game');
-    let gameStarted = false;
-
-    function hideLogo() {
-        if (logo) {
-            console.log("Hiding logo");
-            logo.classList.add('hidden');
+        try {
+            while (GameState.locationQueue.length < count) {
+                const location = await this.findValidLocation();
+                if (location) {
+                    GameState.locationQueue.push(location);
+                    console.log(`Preloaded location. Queue size: ${GameState.locationQueue.length}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error preloading locations:', error);
+        } finally {
+            GameState.isPreloading = false;
         }
-    }
+    },
 
-    function showLogo() {
-        if (logo) {
-            console.log("Showing logo");
-            logo.classList.remove('hidden');
+    async updateQueue() {
+        const minQueueSize = 5;
+        if (GameState.locationQueue.length < minQueueSize) {
+            await this.preloadLocations(10 - GameState.locationQueue.length);
         }
-    }
+    },
 
-    startGameButton.addEventListener('click', () => {
-        if (!gameStarted) {
-            console.log("Start Game clicked");
-            hideLogo();
-            gameStarted = true;
-            startGameButton.textContent = 'Restart Game';
-            gameLoop(); // Directly call gameLoop instead of startGame
-        } else {
-            console.log("Restart Game clicked");
-            showLogo();
-            restartGame();
-            gameStarted = false;
-            startGameButton.textContent = 'Start Game';
+    getNextLocation() {
+        const location = GameState.locationQueue.shift();
+        this.updateQueue(); // Dynamically update the queue
+        return location;
+    },
+
+    async findValidLocation() {
+        const maxAttempts = 20;
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            const regions = [
+                { lat: 40.7128, lng: -74.0060, label: "New York" },
+                { lat: 51.5074, lng: -0.1278, label: "London" },
+                { lat: 48.8566, lng: 2.3522, label: "Paris" },
+                { lat: 35.6762, lng: 139.6503, label: "Tokyo" },
+                { lat: 37.7749, lng: -122.4194, label: "San Francisco" },
+                { lat: 52.5200, lng: 13.4050, label: "Berlin" },
+                { lat: 41.9028, lng: 12.4964, label: "Rome" },
+                { lat: -33.8688, lng: 151.2093, label: "Sydney" },
+                { lat: 55.7558, lng: 37.6173, label: "Moscow" },
+                { lat: 40.4168, lng: -3.7038, label: "Madrid" },
+                { lat: 43.6532, lng: -79.3832, label: "Toronto" },
+                { lat: 34.0522, lng: -118.2437, label: "Los Angeles" },
+                { lat: 19.4326, lng: -99.1332, label: "Mexico City" },
+                { lat: 4.7110, lng: -74.0721, label: "Bogota" }
+            ];
+
+            const cryptoRandom = () => {
+                const array = new Uint32Array(1);
+                crypto.getRandomValues(array);
+                return array[0] / (0xffffffff + 1);
+            };
+
+            const regionIndex = Math.floor(cryptoRandom() * regions.length);
+            const region = regions[regionIndex];
+            
+            const latOffset = (cryptoRandom() - 0.5) * 0.7;
+            const lngOffset = (cryptoRandom() - 0.5) * 0.7;
+
+            const lat = region.lat + latOffset;
+            const lng = region.lng + lngOffset;
+
+            try {
+                const result = await new Promise((resolve, reject) => {
+                    const sv = new google.maps.StreetViewService();
+                    sv.getPanorama({
+                        location: { lat, lng },
+                        radius: 75000,
+                        source: google.maps.StreetViewSource.OUTDOOR,
+                        preference: google.maps.StreetViewPreference.BEST
+                    }, (data, status) => {
+                        if (status === google.maps.StreetViewStatus.OK) {
+                            resolve(data);
+                        } else {
+                            reject(status);
+                        }
+                    });
+                });
+
+                const panoId = result.location.pano;
+                if (!this.usedPanoramas.has(panoId)) {
+                    this.usedPanoramas.add(panoId);
+                    if (this.usedPanoramas.size > 50) {
+                        const oldestPano = this.usedPanoramas.values().next().value;
+                        this.usedPanoramas.delete(oldestPano);
+                    }
+
+                    return {
+                        pano: panoId,
+                        lat: result.location.latLng.lat(),
+                        lng: result.location.latLng.lng(),
+                        originalCity: region.label
+                    };
+                }
+            } catch (error) {
+                console.log(`Attempt ${attempts + 1} failed: ${error}`);
+            }
+
+            attempts++;
         }
-    });
 
-    initGame(); // Keep this to ensure initial setup
-});
-
-
-function createBingoBoard() {
-    const board = document.getElementById('bingo-board');
-    if (!board) {
-        console.error("Bingo board element not found!");
-        return;
+        console.error('Failed to find a valid location after maximum attempts');
+        return null;
     }
-    board.innerHTML = '';
-    currentItems = shuffleArray([...bingoItems]).slice(0, 25);
-    currentItems.forEach(item => {
-        const cell = document.createElement('div');
-        cell.textContent = item;
-        cell.className = 'bingo-cell';
-        cell.addEventListener('click', () => toggleCell(cell));
-        board.appendChild(cell);
-    });
-}
+};
 
-function toggleCell(cell) {
-    if (!gameInProgress) return;
-    cell.classList.toggle('marked');
-    checkForBingo();
-}
 
-function initializeStreetView() {
-    console.log("Initializing Street View");
-    try {
-        const streetviewContainer = document.getElementById('streetview-container');
-        if (!streetviewContainer) {
-            throw new Error("Streetview container not found!");
-        }
-        
-        panorama = new google.maps.StreetViewPanorama(
-            streetviewContainer,
-            {
-                position: {lat: 37.869260, lng: -122.254811},
-                pov: {heading: 165, pitch: 0},
-                zoom: 1,
+// Update StreetViewManager to use the queue
+const StreetViewManager = {
+    initialize() {
+        try {
+            const streetViewDiv = document.getElementById('streetview-container');
+            if (!streetViewDiv) throw new Error('Street view container not found');
+
+            GameState.panorama = new google.maps.StreetViewPanorama(streetViewDiv, {
                 addressControl: false,
+                fullscreenControl: false,
+                motionTracking: false,
+                motionTrackingControl: false,
+                showRoadLabels: false,
                 linksControl: false,
                 panControl: false,
-                enableCloseButton: false,
-                motionTracking: false,
-                motionTrackingControl: false
-            }
-        );
-        
-        panorama.addListener('status_changed', () => {
-            if (panorama.getStatus() !== google.maps.StreetViewStatus.OK) {
-                console.warn('Failed to load Street View for current location. Attempting to get a random view.');
-                getRandomStreetView();
-            } else {
-                console.log('Street View loaded successfully');
-            }
-        });
+                enableCloseButton: false
+            });
 
-        const mediaQuery = window.matchMedia('(max-width: 1024px)');
-        function handleScreenSizeChange(e) {
-            if (panorama) {
-                panorama.setOptions({
-                    motionTracking: false,
-                    motionTrackingControl: false
-                });
-                console.log('Applied mobile-specific Street View settings');
-            }
+            // Start preloading locations immediately
+            LocationQueue.preloadLocations();
+            
+            console.log('Street View initialized successfully');
+            return true;
+        } catch (error) {
+            console.error('Error initializing Street View:', error);
+            return false;
         }
-        mediaQuery.addListener(handleScreenSizeChange);
-        handleScreenSizeChange(mediaQuery); // Apply settings immediately
+    },
 
-        console.log("Street View initialization complete");
-    } catch (error) {
-        console.error("Error initializing Street View:", error.message);
-        alert("Failed to initialize Street View. Please refresh the page and try again.");
-    }
-}
-
-function getRandomStreetView() {
-    const lat = (Math.random() * 170) - 85;
-    const lng = (Math.random() * 360) - 180;
-    
-    const sv = new google.maps.StreetViewService();
-    
-    sv.getPanorama({location: {lat, lng}, radius: 100000}, (data, status) => {
-        if (status === google.maps.StreetViewStatus.OK) {
-            panorama.setPano(data.location.pano);
-            panorama.setPov({heading: 270, pitch: 0});
-            panorama.setVisible(true);
-        } else {
-            console.error('Street View data not found for this location.');
-            getRandomStreetView(); // Try again
+    async getRandomLocation() {
+        // Check if we need to preload more locations
+        if (GameState.locationQueue.length < GameState.minimumQueueSize) {
+            LocationQueue.preloadLocations();
         }
-    });
-}
 
-function setTimer(duration) {
-    timeLeft = Math.floor(duration / 1000); // Convert milliseconds to seconds
-    updateTimer(); // Update the UI to show the timer
-    if (timer) clearInterval(timer); // Stop any existing timer
-    
-    timer = setInterval(() => {
-        if (!gameInProgress) { // If the game is not in progress, stop the timer
-            clearInterval(timer);
+        // Get the next location from the queue
+        if (GameState.locationQueue.length > 0) {
+            const nextLocation = GameState.locationQueue.shift();
+            this.updatePanorama(nextLocation);
             return;
         }
 
-        timeLeft--;
-        updateTimer();
-
-        if (timeLeft <= 0) {
-            getRandomStreetView(); // Get new street view
-            timeLeft = INITIAL_TIME; // Reset the timer
-            updateTimer();
+        // Fallback to direct search if queue is empty
+        const location = await LocationQueue.findValidLocation();
+        if (location) {
+            this.updatePanorama(location);
         }
-    }, 1000); // Update every second
-}
+    },
 
-function showStreetView(duration) {
-    return new Promise(resolve => {
-        setTimer(duration);
-        resolve(); // Resolve immediately to keep the game loop going
-    });
-}
-
-function updateTimer() {
-    const timerElement = document.getElementById('timer');
-    if (timerElement) {
-        timerElement.textContent = `Time left: ${timeLeft}s`;
+    updatePanorama(locationData) {
+        try {
+            GameState.panorama.setPano(locationData.pano);
+            GameState.panorama.setPov({
+                heading: Math.random() * 360,
+                pitch: 0
+            });
+            GameState.panorama.setVisible(true);
+            console.log(`Showing location near ${locationData.originalCity}`);
+        } catch (error) {
+            console.error('Error setting panorama:', error);
+            this.getRandomLocation();
+        }
     }
-}
+};
 
-function checkForBingo() {
-    const cells = Array.from(document.querySelectorAll('.bingo-cell'));
-    
-    // Define all possible winning lines
-    const rows = [
-        [0, 1, 2, 3, 4],
-        [5, 6, 7, 8, 9],
-        [10, 11, 12, 13, 14],
-        [15, 16, 17, 18, 19],
-        [20, 21, 22, 23, 24]
-    ];
+// UI Manager
+const UI = {
+    showToast(message) {
+        let container = document.querySelector('.toast-container');
+        if (!container) {
+            container = this.createToastContainer();
+        }
 
-    const cols = [
-        [0, 5, 10, 15, 20],
-        [1, 6, 11, 16, 21],
-        [2, 7, 12, 17, 22],
-        [3, 8, 13, 18, 23],
-        [4, 9, 14, 19, 24]
-    ];
+        const toast = this.createToastElement(message);
+        container.appendChild(toast);
+        
+        setTimeout(() => this.removeToast(toast, container), 5000);
+    },
 
-    const diags = [
-        [0, 6, 12, 18, 24],  // Top-left to bottom-right
-        [4, 8, 12, 16, 20]   // Top-right to bottom-left
-    ];
+    createToastContainer() {
+        const container = document.createElement('div');
+        container.classList.add('toast-container');
+        Object.assign(container.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: '1000'
+        });
+        document.body.appendChild(container);
+        return container;
+    },
 
-    // Combine all possible winning lines
-    const winningLines = [...rows, ...cols, ...diags];
+    createToastElement(message) {
+        const toast = document.createElement('div');
+        toast.classList.add('toast');
+        Object.assign(toast.style, {
+            backgroundColor: '#333',
+            color: 'white',
+            padding: '1rem',
+            marginBottom: '10px',
+            borderRadius: '4px',
+            opacity: '0',
+            transition: 'opacity 0.3s ease-in'
+        });
+        toast.textContent = message;
+        
+        requestAnimationFrame(() => toast.style.opacity = '1');
+        return toast;
+    },
 
-    // Check each winning line
-    const bingo = winningLines.some(line => 
-        line.every(index => cells[index].classList.contains('marked'))
-    );
+    removeToast(toast, container) {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            toast.remove();
+            if (container.children.length === 0) {
+                container.remove();
+            }
+        }, 300);
+    },
 
-    if (bingo) {
+    togglePlaceholderImage(show) {
+        const logo = document.getElementById('logo');
+        if (logo) {
+            logo.style.display = show ? 'block' : 'none';
+        }
+    },
+
+    updateTimer() {
+        const timerElement = document.getElementById('timer');
+        if (timerElement) {
+            timerElement.textContent = `Time left: ${GameState.timeLeft}s`;
+        }
+    }
+};
+
+// Bingo Board Manager
+const BingoBoard = {
+    createBoard() {
+        const board = document.getElementById('bingo-board');
+        if (!board) {
+            console.error("Bingo board element not found!");
+            return;
+        }
+
+        board.innerHTML = '';
+        GameState.currentItems = this.shuffleItems(BINGO_ITEMS).slice(0, 25);
+        
+        GameState.currentItems.forEach(item => {
+            const cell = document.createElement('div');
+            cell.textContent = item;
+            cell.className = 'bingo-cell';
+            cell.addEventListener('click', () => this.toggleCell(cell));
+            board.appendChild(cell);
+        });
+    },
+
+    shuffleItems(items) {
+        const newArray = [...items];
+        for (let i = newArray.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        }
+        return newArray;
+    },
+
+    toggleCell(cell) {
+        if (!GameState.gameInProgress) return;
+        cell.classList.toggle('marked');
+        if (this.checkForBingo()) {
+            GameController.stopGame();
+        }
+    },
+
+    checkForBingo() {
+        const cells = Array.from(document.querySelectorAll('.bingo-cell'));
+        const lines = this.getBingoLines();
+        
+        const bingo = lines.some(line => 
+            line.every(index => cells[index].classList.contains('marked'))
+        );
+
+        if (bingo) {
+            this.handleBingo();
+        }
+
+        return bingo;
+    },
+
+    getBingoLines() {
+        const rows = [
+            [0,1,2,3,4], [5,6,7,8,9], [10,11,12,13,14],
+            [15,16,17,18,19], [20,21,22,23,24]
+        ];
+        const cols = [
+            [0,5,10,15,20], [1,6,11,16,21], [2,7,12,17,22],
+            [3,8,13,18,23], [4,9,14,19,24]
+        ];
+        const diags = [
+            [0,6,12,18,24], [4,8,12,16,20]
+        ];
+        return [...rows, ...cols, ...diags];
+    },
+
+    handleBingo() {
         const username = localStorage.getItem('username');
         const roomCode = localStorage.getItem('roomCode');
 
-        // Comprehensive socket validation
-        if (typeof socket !== 'undefined' && socket) {
-            try {
-                socket.emit('playerBingo', { roomCode, username });
-                console.log('Bingo event emitted successfully');
-            } catch (error) {
-                console.error('Error emitting bingo event:', error);
+        if (GameState.socket?.connected) {
+            GameState.socket.emit('playerBingo', { roomCode, username });
+        }
+    }
+};
+
+// Game Controller
+const GameController = {
+    async initGame() {
+        if (window.gameInitialized) {
+            console.log('Game already initialized');
+            return;
+        }
+        
+        try {
+            const roomCode = localStorage.getItem('roomCode');
+            const username = localStorage.getItem('username');
+            
+            if (!roomCode || !username) {
+                console.error("Missing room code or username");
+                window.location.href = 'index.html';
+                return;
             }
-        } else {
-            console.error('Socket is not initialized');
+
+            if (!StreetViewManager.initialize()) {
+                throw new Error('Failed to initialize Street View');
+            }
+
+            SocketManager.initialize();
+            BingoBoard.createBoard();
+            UI.togglePlaceholderImage(true);
+            this.setupEventListeners();
+
+            window.gameInitialized = true;
+            console.log("Game initialization completed successfully");
+
+        } catch (error) {
+            console.error('Game initialization failed:', error);
+            UI.showToast('Failed to initialize game. Please refresh the page.');
+        }
+    },
+
+    setupEventListeners() {
+        const startButton = document.getElementById('start-game');
+        if (startButton) {
+            startButton.addEventListener('click', () => {
+                if (!GameState.gameInProgress) {
+                    this.startGame();
+                } else {
+                    this.restartGame();
+                }
+            });
+        }
+    },
+
+    async startGame() {
+        if (GameState.gameInProgress) return;
+
+        // Ensure we have locations preloaded before starting
+        if (GameState.locationQueue.length === 0) {
+            UI.showToast("Preparing locations...");
+            await LocationQueue.preloadLocations();
+        }
+
+        GameState.gameInProgress = true;
+        BingoBoard.createBoard();
+        UI.togglePlaceholderImage(false);
+        
+        StreetViewManager.getRandomLocation();
+        this.startTimer();
+    },
+
+    stopGame() {
+        GameState.gameInProgress = false;
+        if (GameState.timer) {
+            clearInterval(GameState.timer);
+            GameState.timer = null;
         }
         
-        return true;  // Explicitly return true for bingo
-    }
-
-    return false;  // No bingo
-}
-
-
-// Modify toggleCell to use the return value
-function toggleCell(cell) {
-    if (!gameInProgress) return;
-    cell.classList.toggle('marked');
-    
-    // If checkForBingo returns true, the game stops
-    if (checkForBingo()) {
-        stopGame();
-    }
-}
-
-
-function showToast(message) {
-    // Create container if it doesn't exist
-    let container = document.querySelector('.toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.classList.add('toast-container');
-        document.body.appendChild(container);
-    }
-
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.classList.add('toast');
-    toast.textContent = message;
-    
-    // Add to container
-    container.appendChild(toast);
-    
-    // Remove toast after animation
-    setTimeout(() => {
-        toast.remove();
+        GameState.timeLeft = 0;
+        UI.updateTimer();
         
-        // Remove container if no toasts left
-        if (container.children.length === 0) {
-            container.remove();
+        const cells = document.querySelectorAll('.bingo-cell');
+        cells.forEach(cell => cell.style.pointerEvents = 'none');
+    },
+
+    restartGame() {
+        this.stopGame();
+        GameState.timeLeft = CONFIG.INITIAL_TIME;
+        BingoBoard.createBoard();
+        UI.updateTimer();
+        UI.togglePlaceholderImage(true);
+        
+        if (GameState.panorama) {
+            GameState.panorama.setVisible(false);
         }
-    }, 5000);
-}
+    },
 
-socket.on('bingoAnnouncement', ({ winner, roomCode }) => {
-    showToast(`${winner} has won the Bingo game!`);
-    stopGame();
-});
+    startTimer() {
+        GameState.timeLeft = CONFIG.INITIAL_TIME;
+        UI.updateTimer();
 
+        if (GameState.timer) clearInterval(GameState.timer);
+        
+        GameState.timer = setInterval(() => {
+            if (!GameState.gameInProgress) {
+                clearInterval(GameState.timer);
+                return;
+            }
 
+            GameState.timeLeft--;
+            UI.updateTimer();
 
+            if (GameState.timeLeft <= 0) {
+                StreetViewManager.getRandomLocation();
+                GameState.timeLeft = CONFIG.INITIAL_TIME;
+                UI.updateTimer();
+            }
+        }, 1000);
+    },
 
-
-// Modify getRandomStreetView to use a seeded random for consistent views
-function getRandomStreetView(seed) {
-    // Use the seed to generate consistent random locations for all players
-    function seededRandom(seed) {
-        const x = Math.sin(seed) * 10000;
-        return x - Math.floor(x);
-    }
-
-    const seedValue = seed || Date.now();
-    const lat = (seededRandom(seedValue) * 170) - 85;
-    const lng = (seededRandom(seedValue + 1) * 360) - 180;
-    
-    const sv = new google.maps.StreetViewService();
-    
-    sv.getPanorama({location: {lat, lng}, radius: 100000}, (data, status) => {
-        if (status === google.maps.StreetViewStatus.OK) {
-            panorama.setPano(data.location.pano);
-            panorama.setPov({heading: 270, pitch: 0});
-            panorama.setVisible(true);
-        } else {
-            console.error('Street View data not found for this location.');
-            getRandomStreetView(seedValue + 1); // Try again with a different seed
+    hashCode(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
         }
-    });
-}
-
-// Modify gameLoop to use a consistent seed
-function gameLoop() {
-    if (gameInProgress) return;
-  
-    gameInProgress = true;
-    console.log("gameLoop called");
-  
-    createBingoBoard();
-    togglePlaceholderImage(false);
-
-    const cells = document.querySelectorAll('.bingo-cell');
-    cells.forEach(cell => {
-        cell.style.pointerEvents = 'auto';
-        cell.classList.remove('marked');
-    });
-
-    // Use room code as seed for consistent random location
-    const roomCode = localStorage.getItem('roomCode');
-    const seed = roomCode ? hashCode(roomCode) : Date.now();
-    getRandomStreetView(seed);
-    setTimer(30000);
-}
-
-// Helper function to generate consistent hash from room code
-function hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
+        return Math.abs(hash);
     }
-    return Math.abs(hash);
-}
+};
 
+// Socket Manager
+const SocketManager = {
+    initialize() {
+        if (GameState.socket?.connected) {
+            console.log('Socket already initialized');
+            return;
+        }
 
-function stopGame() {
-    if (window.gameLoopTimeout) {
-        clearTimeout(window.gameLoopTimeout);
+        GameState.socket = io(CONFIG.SOCKET_URL, {
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+
+        this.setupEventHandlers();
+    },
+
+    setupEventHandlers() {
+        GameState.socket.on('connect', () => {
+            const roomCode = localStorage.getItem('roomCode');
+            if (roomCode) {
+                GameState.socket.emit('joinRoom', roomCode);
+            }
+        });
+
+        GameState.socket.on('gameStarted', data => {
+            console.log('Received game start data:', data);
+            const seed = data.seed || Date.now();
+            UI.togglePlaceholderImage(false);
+            BingoBoard.createBoard();
+            StreetViewManager.getRandomLocation(seed);
+            GameController.startTimer();
+        });
+
+        GameState.socket.on('updatePlayers', players => {
+            const listContainer = document.getElementById('player-list');
+            if (!listContainer) return;
+
+            listContainer.innerHTML = '';
+            players.forEach(player => {
+                const li = document.createElement('li');
+                li.textContent = player;
+                listContainer.appendChild(li);
+            });
+        });
+
+        setInterval(() => GameState.socket.emit('ping'), CONFIG.PING_INTERVAL);
     }
-    
-    const startButton = document.getElementById('start-game');
-    if (startButton) {
-        startButton.removeEventListener('click', gameLoop);
-    }
-    
-    const cells = document.querySelectorAll('.bingo-cell');
-    cells.forEach(cell => {
-        cell.style.pointerEvents = 'none';
-    });
-    
-    if (timer) {
-        clearInterval(timer);
-        timer = null;
-    }
-    
-    gameInProgress = false;
-    timeLeft = 0;
-    updateTimer();
-    updateStartButton();
-}
+};
 
-function updateStartButton() {
-    const startButton = document.getElementById('start-game');
-    if (!startButton) return;
-    
-    startButton.textContent = 'Restart Game';
-    startButton.removeEventListener('click', gameLoop);
-    startButton.addEventListener('click', restartGame);
-}
+// Initialize map callback
+window.initMap = function() {
+    console.log("Google Maps API loaded");
+    GameController.initGame();
+};
 
-function restartGame() {
-    stopGame(); // Stop the game first
-
-    // Reset the game state
-    gameInProgress = false;
-    timeLeft = INITIAL_TIME; // Reset the time for the new game
-    createBingoBoard(); // Reset the bingo board
-    updateTimer(); // Update the timer display
-
-    const startButton = document.getElementById('start-game');
-    if (startButton) {
-        startButton.textContent = 'Start Game'; // Change button back to "Start Game"
-        startButton.removeEventListener('click', restartGame); // Remove the restart game listener
-        startButton.addEventListener('click', gameLoop); // Attach gameLoop to start the game
-    }
-
-    if (panorama) {
-        panorama.setVisible(false); // Hide the panorama
-    }
-
-    togglePlaceholderImage(true); // Show the placeholder image
-}
-
-function gameLoop() {
-    if (gameInProgress) return;
-  
-    gameInProgress = true;
-    console.log("gameLoop called");
-  
-    createBingoBoard();
-    togglePlaceholderImage(false);
-
-    const cells = document.querySelectorAll('.bingo-cell');
-    cells.forEach(cell => {
-        cell.style.pointerEvents = 'auto';
-        cell.classList.remove('marked');
-    });
-
-    getRandomStreetView();
-    setTimer(30000);
-}
-
-function shuffleArray(array) {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-}
-
-function gm_authFailure() {
+// Handle Google Maps authentication failure
+window.gm_authFailure = () => {
     console.error("Google Maps failed to load!");
-    alert("Failed to load Google Maps. Please check your API key and try again.");
-}
-
-function togglePlaceholderImage(show) {
-    const placeholderImage = document.getElementById('logo');
-    if (placeholderImage) {
-        placeholderImage.style.display = show ? 'block' : 'none';
-    }
-}
+    UI.showToast("Failed to load Google Maps. Please check your API key and try again.");
+};

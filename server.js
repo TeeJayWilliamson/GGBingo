@@ -7,26 +7,6 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 
 const app = express();
-const server = http.createServer(app);
-
-server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error('Port is already in use');
-    } else {
-      console.error('An error occurred:', error);
-    }
-  });
-
-// Load environment variables
-dotenv.config();
-
-
-
-// Add CORS middleware
-app.use(cors());
-
-// Serve static files BEFORE other middleware
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Define allowed origins
 const allowedOrigins = [
@@ -35,6 +15,7 @@ const allowedOrigins = [
     'https://ggbingo.onrender.com'  // Add your production URL
 ];
 
+const server = http.createServer(app);
 // Configure Socket.IO with dynamic CORS
 const io = socketIo(server, {
     cors: {
@@ -50,6 +31,27 @@ const io = socketIo(server, {
     },
     transports: ['websocket', 'polling']
 });
+
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error('Port is already in use');
+    } else {
+      console.error('An error occurred:', error);
+    }
+  });
+
+// Load environment variables
+dotenv.config();
+
+// Add CORS middleware
+app.use(cors());
+
+// Serve static files BEFORE other middleware
+app.use(express.static(path.join(__dirname, 'public')));
+
+
+
+
 
 const PORT = process.env.PORT || 3000;
 
@@ -189,22 +191,58 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
         if (socket.roomCode && rooms[socket.roomCode]) {
+            // Only remove the specific user, not entire player list
             rooms[socket.roomCode].players = rooms[socket.roomCode].players.filter(p => p !== socket.username);
-            io.to(socket.roomCode).emit('roomUpdate', {
-                roomCode: socket.roomCode,
-                players: rooms[socket.roomCode].players,
-                creator: rooms[socket.roomCode].creator
+            
+            // If room is now empty AND game is not in progress, you might want to clean it up
+            if (rooms[socket.roomCode].players.length === 0 && !rooms[socket.roomCode].isGameStarted) {
+                delete rooms[socket.roomCode];
+            } else {
+                // Notify other players about player removal
+                io.to(socket.roomCode).emit('roomUpdate', {
+                    roomCode: socket.roomCode,
+                    players: rooms[socket.roomCode].players,
+                    creator: rooms[socket.roomCode].creator
+                });
+            }
+        }  // <-- This closing brace was missing
+    });
+    
+    
+    socket.on('startGame', (roomCode) => {
+        console.log(`Attempt to start game in room ${roomCode}`);
+        const room = rooms[roomCode];
+        if (room && room.players.length > 0) {
+            const seed = Math.floor(Math.random() * 1000000);
+            
+            // Critically, do NOT modify room.players or set room to empty
+            room.isGameStarted = true;
+            
+            // Broadcast game start to ALL players in the room
+            io.to(roomCode).emit('gameStarted', { 
+                seed: seed,
+                players: room.players,
+                roomCode: roomCode
             });
             
-            if (rooms[socket.roomCode].players.length === 0) {
-                rooms[socket.roomCode].lastEmpty = Date.now();
-            }
-            
-            console.log(`${socket.username} removed from room ${socket.roomCode}`);
-            console.log(`Current players in room ${socket.roomCode}:`, rooms[socket.roomCode].players);
+            console.log(`Game started in room ${roomCode} with seed ${seed}`);
+            console.log(`Players in room: ${room.players}`);
         }
     });
     
+    // Add game sync request handler
+    socket.on('requestGameSync', (data, callback) => {
+        const room = rooms[data.roomCode];
+        if (room) {
+            callback({
+                isGameStarted: room.isGameStarted,
+                seed: room.gameSeed, // Store seed when game starts
+                players: room.players
+            });
+        } else {
+            callback(null);
+        }
+    });
     
 
     // Handle joining rooms
@@ -247,26 +285,35 @@ io.on('connection', (socket) => {
     });
 
     // Handle game start
-socket.on('startGame', (roomCode) => {
-    console.log(`Attempt to start game in room ${roomCode}`);
-    const room = rooms[roomCode];
-    if (room && room.players.length > 0) {
-        room.isGameStarted = true;
-        // Broadcast game start to ALL players in the room
-        io.to(roomCode).emit('gameStarted');
-        console.log(`Game started in room ${roomCode}`);
-    }
-});
-
-socket.on('playerBingo', ({ roomCode, username }) => {
-    console.log(`Bingo called in room ${roomCode} by ${username}`);
-    // Broadcast to ALL players in the room
-    io.to(roomCode).emit('bingoAnnouncement', {
-        winner: username,
-        roomCode
+    socket.on('startGame', (roomCode) => {
+        console.log(`Attempt to start game in room ${roomCode}`);
+        const room = rooms[roomCode];
+        if (room && room.players.length > 0) {
+            room.isGameStarted = true;
+            
+            // Generate a consistent seed for random location
+            const seed = Math.floor(Math.random() * 1000000);
+            
+            // Broadcast game start to ALL players in the room with a seed
+            io.to(roomCode).emit('gameStarted', { 
+                seed: seed,
+                players: room.players 
+            });
+            console.log(`Game started in room ${roomCode} with seed ${seed}`);
+        }
     });
-});
 
+    socket.on('playerBingo', ({ roomCode, username }) => {
+        console.log(`Bingo called in room ${roomCode} by ${username}`);
+        io.to(roomCode).emit('bingoAnnouncement', {
+            winner: username,
+            roomCode
+        });
+        console.log(`Emitted bingoAnnouncement for room ${roomCode}, winner: ${username}`);
+    });
+
+
+    
 
 
     // Handle disconnections
@@ -335,3 +382,4 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (error) => {
     console.error('Unhandled Rejection:', error);
 });
+
